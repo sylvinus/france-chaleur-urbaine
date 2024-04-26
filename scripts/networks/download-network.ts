@@ -146,10 +146,9 @@ export const downloadNetwork = async (table: SourceId) => {
   const startTime = Date.now();
   logger.info('start network update');
 
+  const addIds: number[] = [];
+  let updateCount = 0;
   if (table === 'network' || table === 'coldNetwork') {
-    const addIds: number[] = [];
-    let updateCount = 0;
-
     const networksDB = await db(tileInfo.table).select(
       'id_fcu',
       'communes',
@@ -192,27 +191,33 @@ export const downloadNetwork = async (table: SourceId) => {
         }
       })
     );
-    logger.info('', {
-      add: addIds.length,
-      addIds: addIds.length > 0 ? addIds.toString() : '0',
-      update: updateCount,
-    });
   } else if (table === 'futurNetwork') {
-    const addIds: number[] = [];
-    const networksDB = await db(tileInfo.table).select('id_fcu');
+    const networksDB = await db(tileInfo.table).select('id_fcu', 'is_zone');
     await Promise.all(
       networksDB.map(async (network) => {
         const networkAirtable = networksAirtable.find(
           (row) => row.get('id_fcu') === network['id_fcu']
         );
-        if (!networkAirtable) {
+        if (networkAirtable) {
+          if (
+            network['is_zone'] !==
+            convertAirtableValue(networkAirtable.get('is_zone'), TypeBool)
+          ) {
+            updateCount++;
+            await base(tileInfo.airtable as string).update(networkAirtable.id, {
+              is_zone: network['is_zone'],
+            });
+          }
+        } else {
           addIds.push(network['id_fcu']);
           await base(tileInfo.airtable as string).create(
             [
               {
                 fields: {
                   id_fcu: network['id_fcu'],
-                  communes: network['communes'],
+                  communes:
+                    network['communes'] && network['communes'].toString(),
+                  is_zone: network['is_zone'],
                 },
               },
             ],
@@ -223,11 +228,12 @@ export const downloadNetwork = async (table: SourceId) => {
         }
       })
     );
-    logger.info('', {
-      add: addIds.length,
-      addIds: addIds.length > 0 ? addIds.toString() : '0',
-    });
   }
+  logger.info('', {
+    add: addIds.length,
+    addIds: addIds.length > 0 ? addIds.toString() : '0',
+    update: updateCount,
+  });
 
   await Promise.all(
     networksAirtable.map(async (network) => {
