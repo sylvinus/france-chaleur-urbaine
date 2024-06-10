@@ -5,7 +5,18 @@
   "singleQuote": true,
   "overrides": [
     {
-      "files": ["*.ts", "*.tsx"]
+      "files": [
+        "*.ts",
+        "*.tsx"
+      ]
+    },
+    {
+      "files": [
+        "src/services/simulateur/*.ts"
+      ],
+      "options": {
+        "printWidth": 300
+      }
     }
   ]
 }
